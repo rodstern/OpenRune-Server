@@ -76,11 +76,19 @@ suspend fun ProtectedAccess.openFletchMenu(
     // Sorted by level because a trigger can now gather recipes from more than one place in the
     // table - a knife on teak logs reaches both the teak stock and the hunter's spear - and the
     // make-X menu should still read low level to high.
-    val affordable =
-        recipes
-            .map { it.withHeldFeather(inv, preferredFeather) }
-            .filter { hasStatReqs(it.statReq) && it.maxProducible(inv) > 0 }
-            .sortedBy { it.fletchingLevel() }
+    val producible =
+        recipes.map { it.withHeldFeather(inv, preferredFeather) }.filter { it.maxProducible(inv) > 0 }
+    val affordable = producible.filter { hasStatReqs(it.statReq) }.sortedBy { it.fletchingLevel() }
+    if (affordable.isEmpty()) {
+        // The player has the materials but not the level for any of them: say which level opens
+        // the nearest recipe instead of leaving the click without a response.
+        val nearest =
+            producible.filter { it.hasTool(inv) }.minByOrNull { it.fletchingLevel() }
+        if (nearest != null) {
+            meetsStatReqs(nearest.statReq)
+            return
+        }
+    }
     val candidates = affordable.filter { it.hasTool(inv) }
     if (candidates.isEmpty()) {
         // Only complain when the tool is the sole thing standing in the way; an empty menu for any
