@@ -26,7 +26,7 @@ fun ScriptContext.registerFletchingQueue() {
  * each recipe the player doesn't yet qualify for.
  */
 private fun ProtectedAccess.hasStatReqs(reqs: List<Tuple2<StatType, Int>>): Boolean =
-    reqs.all { statBase(it.t0.internalName) >= it.t1 }
+    reqs.all { stat(it.t0.internalName) >= it.t1 }
 
 private val AMMUNITION_NAME = Regex("(arrows?|bolts?|darts?)$")
 
@@ -40,7 +40,7 @@ private fun ProtectedAccess.meetsStatReqs(recipe: FletchingRecipe): Boolean {
     for (req in recipe.statReq) {
         val stat = req.t0
         val level = req.t1
-        if (statBase(stat.internalName) < level) {
+        if (stat(stat.internalName) < level) {
             val name = stat.displayName.ifEmpty { stat.internalName.removePrefix("stat.") }
             mes("You need a $name level of $level to make ${recipe.levelTarget()}.")
             return false
