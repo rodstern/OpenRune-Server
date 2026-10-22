@@ -21,20 +21,28 @@ fun ScriptContext.registerFletchingQueue() {
 
 /**
  * Silent stat-requirement check used to build the candidate list for the make-X menu.
- * [meetsStatReqs] below shows a message box on failure, which is only appropriate for the single
- * recipe the player actually chose - running it over every candidate here would fire a blocking
- * dialog for each recipe the player doesn't yet qualify for.
+ * [meetsStatReqs] below sends a chat message on failure, which is only appropriate for the single
+ * recipe the player actually chose - running it over every candidate here would spam a message for
+ * each recipe the player doesn't yet qualify for.
  */
 private fun ProtectedAccess.hasStatReqs(reqs: List<Tuple2<StatType, Int>>): Boolean =
     reqs.all { statBase(it.t0.internalName) >= it.t1 }
 
-private suspend fun ProtectedAccess.meetsStatReqs(reqs: List<Tuple2<StatType, Int>>): Boolean {
-    for (req in reqs) {
+private val AMMUNITION_NAME = Regex("(arrows?|bolts?|darts?)$")
+
+/** Ammunition names the item ("...to make Bronze arrow."); everything else just says "this". */
+private fun FletchingRecipe.levelTarget(): String {
+    val name = output.name
+    return if (AMMUNITION_NAME.containsMatchIn(name.lowercase())) name else "this"
+}
+
+private fun ProtectedAccess.meetsStatReqs(recipe: FletchingRecipe): Boolean {
+    for (req in recipe.statReq) {
         val stat = req.t0
         val level = req.t1
         if (statBase(stat.internalName) < level) {
             val name = stat.displayName.ifEmpty { stat.internalName.removePrefix("stat.") }
-            mesbox("You need a $name level of $level.")
+            mes("You need a $name level of $level to make ${recipe.levelTarget()}.")
             return false
         }
     }
@@ -50,7 +58,7 @@ private fun FletchingRecipe.fletchingLevel(): Int =
     statReq.firstOrNull { it.t0.internalName == "stat.fletching" }?.t1 ?: 0
 
 suspend fun ProtectedAccess.startFletching(recipe: FletchingRecipe, amount: Int) {
-    if (!meetsStatReqs(recipe.statReq)) return
+    if (!meetsStatReqs(recipe)) return
     val tool = recipe.tool
     if (tool != null && !recipe.hasTool(inv)) {
         mes(missingToolMessage(tool))
@@ -85,7 +93,7 @@ suspend fun ProtectedAccess.openFletchMenu(
         val nearest =
             producible.filter { it.hasTool(inv) }.minByOrNull { it.fletchingLevel() }
         if (nearest != null) {
-            meetsStatReqs(nearest.statReq)
+            meetsStatReqs(nearest)
             return
         }
     }
@@ -129,7 +137,7 @@ private fun ProtectedAccess.knifeSpeedup(recipe: FletchingRecipe): Int {
 private suspend fun ProtectedAccess.processFletchTick(task: FletchingTask) {
     val recipe = task.recipe
 
-    if (!meetsStatReqs(recipe.statReq) || !recipe.hasTool(inv) || !recipe.hasMaterials(inv)) {
+    if (!meetsStatReqs(recipe) || !recipe.hasTool(inv) || !recipe.hasMaterials(inv)) {
         resetAnim()
         return
     }
